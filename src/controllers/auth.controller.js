@@ -38,26 +38,44 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   try {
-    // check if user already exists
+    // Check if user exists
     const { email, password } = req.body;
+
     const user = await User.findOne({
       email: email.toLowerCase(),
     });
 
-    if (!user)
+    if (!user) {
       return res.status(400).json({
-        message: "user not found",
+        message: "User not found",
       });
+    }
 
-    // compare passwords
+    // Compare passwords
     const isMatch = await user.comparePassword(password);
-    if (!isMatch)
-      return res.status(400).json({
-        message: "invalid credentials",
-      });
 
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
+    }
+
+    // Generate tokens
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    console.log("Access:", accessToken);
+    console.log("Refresh:", refreshToken);
+
+    // Save refresh token in DB
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    // Send response
     res.status(200).json({
-      message: "user logged in",
+      message: "User logged in successfully",
+      accessToken,
+      refreshToken,
       user: {
         id: user._id,
         email: user.email,
@@ -66,7 +84,7 @@ const loginUser = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: "internal server error",
+      message: "Internal server error",
     });
   }
 };
@@ -79,19 +97,23 @@ const logoutUser = async (req, res) => {
       email: email.toLowerCase(),
     });
 
-    if (!user)
+    if (!user) {
       return res.status(400).json({
-        message: "user not found",
+        message: "User not found",
       });
+    }
+
+    // Remove refresh token
+    user.refreshToken = undefined;
+    await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
-      message: "logout successful",
-    });  
+      message: "Logout successful",
+    });
   } catch (error) {
     res.status(500).json({
-      message: "internal server error",
+      message: "Internal server error",
     });
   }
 };
-export { registerUser, loginUser,logoutUser };
-
+export { registerUser, loginUser, logoutUser };
